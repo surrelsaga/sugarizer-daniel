@@ -8,6 +8,7 @@ define(["sugar-web/activity/activity"], function (activity) {
 
 		const gridContainer = document.getElementById('grid-container');
 		const svgCanvas = document.getElementById('line-canvas');
+		const clearBtn = document.getElementById('clear-button');
 
 		//State variables
 		var isDrawing = false;
@@ -47,7 +48,6 @@ define(["sugar-web/activity/activity"], function (activity) {
 			svgCanvas.appendChild(line);
 		}
 
-
 		//Genera the dots
 		for(var i = 0; i < totalDots; i++) {
 			//Create invisible wrappers
@@ -61,16 +61,16 @@ define(["sugar-web/activity/activity"], function (activity) {
 			// Drawing connecting straight lines logic
 
 			// Click to start/stop drawing
-			wrapper.addEventListener('click', () => {
+			dot.addEventListener('click', () => {
 				isDrawing = !isDrawing;
 
 				if(isDrawing) {
-					lastDotCoords = getCoordinates(wrapper);
+					lastDotCoords = getCoordinates(dot);
 					dot.classList.add('active');
 				} else {
 					lastDotCoords = null;
 
-					//Remove highlighting dots
+					//Remove highlighting dots when stop drawing
 					document.querySelectorAll('.dot.active').forEach(activeDots => {
 						activeDots.classList.remove('active');
 					});
@@ -78,12 +78,12 @@ define(["sugar-web/activity/activity"], function (activity) {
 			});
 
 			// Drag to another dot to draw lines
-			wrapper.addEventListener('mouseenter', () => {
+			dot.addEventListener('mouseenter', () => {
 				// If we're not in drawing mode, we ignore and don't do anything
 				if(!isDrawing) return;
 				
 				// Get coordinates of the wrapper we just enter;
-				const currentDotCoords = getCoordinates(wrapper);
+				const currentDotCoords = getCoordinates(dot);
 
 				//Draw line from the last remembered dot to this new dot
 				drawLine(lastDotCoords, currentDotCoords);
@@ -95,12 +95,20 @@ define(["sugar-web/activity/activity"], function (activity) {
 				dot.classList.add('active');
 			});
 
-			
-
 			//Put dot inside wrapper, wrappper into the grid
 			wrapper.appendChild(dot);
 			gridContainer.appendChild(wrapper);
 		}
+
+		// Clear buttons
+		clearBtn.addEventListener('click', () => {
+			document.querySelectorAll('line').forEach(line => line.remove());
+			
+			// Reset all states back to default mode
+			isDrawing = false;
+			lastDotCoords = null;
+		});
+
 	});
 
 });

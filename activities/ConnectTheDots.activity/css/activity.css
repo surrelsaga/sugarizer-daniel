@@ -43,6 +43,19 @@
   cursor: pointer;
 }
 
+/* We make an invisible block surrounding dot, the mouseenter event will be triggered inside this event which makes it easier to connect dots */
+.dot::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%); /* Centers it perfectly over the dot */
+    width: 30px;  /* The Goldilocks size: small enough for diagonals, big enough for speed */
+    height: 30px;
+    background: transparent; /* Keep it invisible */
+    border-radius: 50%;
+}
+
 /* Add effects for each dot */
 .dot.active {
   background-color: red;
