@@ -1,0 +1,50 @@
+#main-toolbar #activity-button {
+  background-image: url(../activity/activity-icon.svg);
+}
+
+#main-toolbar #undo-button {
+  background-image: url(../icons/edit-undo.svg);
+}
+
+#main-toolbar #redo-button {
+  background-image: url(../icons/edit-redo.svg);
+}
+
+#main-toolbar #clear-button {
+  background-image: url(../icons/edit-clear.svg);
+}
+
+#grid-container {
+    display: grid;
+    /* This automatically creates as many 40px columns as will fit on the screen */
+    grid-template-columns: repeat(auto-fill, 40px);
+    width: 100vw;
+    height: 100vh;
+    align-content: start;
+    background-color: white;;
+}
+
+/* Style the invisible wrappers */
+.dot-wrapper {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Style the divs into circles */
+.dot {
+  width: 10px;
+  height: 10px;
+  background-color: #8c97a7;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+/* Add effects for each dot */
+.dot.active {
+  width: 13px;
+  height: 13px;
+}
