@@ -45,6 +45,23 @@
 
 /* Add effects for each dot */
 .dot.active {
+  background-color: red;
   width: 13px;
   height: 13px;
+}
+
+#line-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none; /* Crucial: lets clicks pass through to the dots */
+    z-index: 10; /* Ensures lines draw on top of the grid */
+}
+
+line {
+    stroke: #8c97a7; /* Same color as your dots */
+    stroke-width: 2;
+    stroke-linecap: round;
 }
