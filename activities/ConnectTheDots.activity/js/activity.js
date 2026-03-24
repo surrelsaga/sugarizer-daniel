@@ -132,6 +132,10 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 
 								// Draw on the screen
 								svgCanvas.appendChild(polygon);
+
+								// Track polygon in history so undo/redo works
+								undoStack.push(polygon);
+								redoStack = [] // When draw a new polygon, can not redo
 							}
 						}
 
@@ -176,8 +180,12 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 
 		// Clear button Logic
 		clearBtn.addEventListener('click', function() {
+			//Clear all lines and polygons
 			document.querySelectorAll('line').forEach(function(line) {
 				return line.remove();
+			});
+			document.querySelectorAll('polygon').forEach(function(polygon) {
+				return polygon.remove();
 			});
 			
 			// Reset all states back to default mode
@@ -192,11 +200,11 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 				isDrawing = false;
 				lastDotCoords = null;
 
-				// Extract the last line from undo stack (line to remove)
-				var lineToRemove = undoStack.pop();
+				// Extract the last line/polygon from undo stack (line to remove)
+				var elementToRemove = undoStack.pop();
 
-				// Remove it from the SVG canvas
-				svgCanvas.removeChild(lineToRemove);
+				// Remove them from the SVG canvas
+				svgCanvas.removeChild(elementToRemove);
 
 				// Save to redo Stack if user want to redo
 				redoStack.push(lineToRemove);
@@ -210,14 +218,14 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 				isDrawing = false;
 				lastDotCoords = null;
 
-				// Extract the last line from redo stack (closest one to redo)
-				var lineToRecreate = redoStack.pop();
+				// Extract the last line/polygon from redo stack (closest one to redo)
+				var elementToRecreate = redoStack.pop();
 
-				// Add it to the SVG canvas
-				svgCanvas.appendChild(lineToRecreate);
+				// Add them to the SVG canvas
+				svgCanvas.appendChild(elementToRecreate);
 
 				// Save to undo stack if user want to undo
-				undoStack.push(lineToRecreate);
+				undoStack.push(elementToRecreate);
 			}
 		});
 
