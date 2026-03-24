@@ -238,10 +238,10 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 		clearBtn.addEventListener('click', function() {
 			//Clear all lines and polygons
 			document.querySelectorAll('line').forEach(function(line) {
-				return lineLayer.remove();
+				return lineLayer.removeChild(line);
 			});
 			document.querySelectorAll('polygon').forEach(function(polygon) {
-				return shapeLayer.remove();
+				return shapeLayer.removeChild(polygon)
 			});
 			
 			// Reset all states back to default mode
@@ -291,6 +291,8 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 				if (action.type === 'polygonGroup') {
 					// Load polygon and its lines together back
 					shapeLayer.appendChild(action.polygon);
+					//Re-sort the polygons
+					sortShapeLayer();
 					for(var i = 0; i < action.lines.length; i++) {
 						lineLayer.appendChild(action.lines[i]);
 					}
