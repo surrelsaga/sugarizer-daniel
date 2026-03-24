@@ -6,13 +6,13 @@ define(["sugar-web/activity/activity"], function (activity) {
 		// Initialize the activity.
 		activity.setup();
 
-		const gridContainer = document.getElementById('grid-container');
-		const svgCanvas = document.getElementById('line-canvas');
+		var gridContainer = document.getElementById('grid-container');
+		var svgCanvas = document.getElementById('line-canvas');
 
 		//BUTTONS
-		const undoBtn = document.getElementById('undo-button');
-		const redoBtn = document.getElementById('redo-button');
-		const clearBtn = document.getElementById('clear-button');
+		var undoBtn = document.getElementById('undo-button');
+		var redoBtn = document.getElementById('redo-button');
+		var clearBtn = document.getElementById('clear-button');
 
 		//State variables
 		var isDrawing = false;
@@ -28,16 +28,16 @@ define(["sugar-web/activity/activity"], function (activity) {
 
 		//calculate how many dots we need to fill the screen
 		//Idea: we create many square wrappers (div) limited to 40x40px -> then put the dots inside (dot: styled divs)
-		const columns = Math.floor(window.innerWidth / 40);
-		const rows = Math.floor(window.innerHeight / 40);
-		const totalDots = columns * rows;
+		var columns = Math.floor(window.innerWidth / 40);
+		var rows = Math.floor(window.innerHeight / 40);
+		var totalDots = columns * rows;
 
 		// Function to find exact coordinates (x, y) of a dot
 		function getCoordinates(element) {
-			const dotRect = element.getBoundingClientRect();
+			var dotRect = element.getBoundingClientRect();
 
 			//Get coordinates of the SVG  canvas itself
-			const svgRect = svgCanvas.getBoundingClientRect();
+			var svgRect = svgCanvas.getBoundingClientRect();
 
 			return {
 				x: (dotRect.left - svgRect.left) + dotRect.width / 2,
@@ -48,7 +48,7 @@ define(["sugar-web/activity/activity"], function (activity) {
 		// Function to draw the connecting line (SVG line)
 		function drawLine(startCoords, endCoords) {
 			//Create an SVG line element
-			const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+			var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
 
 			// Set the starting and ending coordinates
 			line.setAttribute('x1', startCoords.x);
@@ -61,104 +61,108 @@ define(["sugar-web/activity/activity"], function (activity) {
 
 
 			// Drawing history logic
-			undoStack.push(line); // Every time we draw a new line, save this to undoStack so to undo, just need to delete the latest line
+			undoStack.push(line); // Every time we draw a new line, save this to undoStack so to undo, just need to devare the latest line
 			redoStack = []; // When draw a new line, can not redo 
 
 			console.log(undoStack);
 		}
 
-		//Genera the dots
+		//Generate the dots
 		for(var i = 0; i < totalDots; i++) {
-			//Create invisible wrappers
-			const wrapper = document.createElement('div');
-			wrapper.classList.add('dot-wrapper');
+			(function() {  //Have to do this because of ES5, variables declared by var can still be used outside the scope
+				//Create invisible wrappers
+				var wrapper = document.createElement('div');
+				wrapper.classList.add('dot-wrapper');
 
-			//Create visibile dots
-			const dot = document.createElement('div');
-			dot.classList.add('dot');
+				//Create visibile dots
+				var dot = document.createElement('div');
+				dot.classList.add('dot');
 
-			// Drawing connecting straight lines logic
+				// Drawing connecting straight lines logic
 
-			// Click to start/stop drawing
-			dot.addEventListener('click', () => {
-				//Switch drawing mode
-				isDrawing = !isDrawing;
+				// Click to start/stop drawing
+				dot.addEventListener('click', function() {
+					//Switch drawing mode
+					isDrawing = !isDrawing;
 
-				if(isDrawing) {
-					lastDotCoords = getCoordinates(dot);
+					if(isDrawing) {
+						lastDotCoords = getCoordinates(dot);
 
-					// Add very starting point to the tracker
-					currentShapePoints = [lastDotCoords];
+						// Add very starting point to the tracker
+						currentShapePoints = [lastDotCoords];
 
-					dot.classList.add('active');
-				} else {
-					const stopDot = getCoordinates(dot);
+						dot.classList.add('active');
+					} else {
+						var stopDot = getCoordinates(dot);
 
-					console.log( currentShapePoints );
+						console.log( currentShapePoints );
 
-					if ( currentShapePoints.length > 3 ) {
-						const startingDot = currentShapePoints[0];
+						if ( currentShapePoints.length > 3 ) {
+							var startingDot = currentShapePoints[0];
 
-						// This condition means user has drawn lines to form a shape
-						if( startingDot.x === stopDot.x && startingDot.y === stopDot.y ) {
+							// This condition means user has drawn lines to form a shape
+							if( startingDot.x === stopDot.x && startingDot.y === stopDot.y ) {
 
-							// Procedure to create a SVG polygons in web page: give coordinates of points and border + inside color
-							// we already have a svg canvas in html, just need to draw on this
-							const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+								// Procedure to create a SVG polygons in web page: give coordinates of points and border + inside color
+								// we already have a svg canvas in html, just need to draw on this
+								var polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
 
-							//Reformat the dot coordinates to string like this "x-coordinate,y-coordinate"
-							//We got an array like this "x1,y1 x2,y2 x3,y3..."
-							const polygonPoints = currentShapePoints.map( point => `${point.x},${point.y}` ).join(' ');
+								//Reformat the dot coordinates to string like this "x-coordinate,y-coordinate"
+								//We got an array like this "x1,y1 x2,y2 x3,y3..."
+								var polygonPoints = currentShapePoints.map( point => `${point.x},${point.y}` ).join(' ');
 
-							polygon.setAttribute('points', polygonPoints);
-							polygon.style.fill = 'rgba(0, 200, 0, 0.4)';
+								polygon.setAttribute('points', polygonPoints);
+								polygon.style.fill = 'rgba(0, 200, 0, 0.4)';
 
-							// Draw on the screen
-							svgCanvas.appendChild(polygon);
+								// Draw on the screen
+								svgCanvas.appendChild(polygon);
+							}
 						}
+
+						//Clear trackers
+						lastDotCoords = null;
+						currentShapePoints = [];
+
+
+						//Remove highlighting dots when stop drawing
+						document.querySelectorAll('.dot.active').forEach(function(activeDots) {
+							activeDots.classList.remove('active');
+						});
 					}
+				});
 
-					//Clear trackers
-					lastDotCoords = null;
-					currentShapePoints = [];
+				// Drag to another dot to draw lines
+				dot.addEventListener('mouseenter', function() {
+					// If we're not in drawing mode, we ignore and don't do anything
+					if(!isDrawing) return;
+					
+					// Get coordinates of the wrapper we just enter;
+					var currentDotCoords = getCoordinates(dot);
 
+					//Draw line from the last remembered dot to this new dot
+					drawLine(lastDotCoords, currentDotCoords);
 
-					//Remove highlighting dots when stop drawing
-					document.querySelectorAll('.dot.active').forEach(activeDots => {
-						activeDots.classList.remove('active');
-					});
-				}
-			});
+					// Track dots coordinates
+					currentShapePoints.push(currentDotCoords);
 
-			// Drag to another dot to draw lines
-			dot.addEventListener('mouseenter', () => {
-				// If we're not in drawing mode, we ignore and don't do anything
-				if(!isDrawing) return;
-				
-				// Get coordinates of the wrapper we just enter;
-				const currentDotCoords = getCoordinates(dot);
+					//Update the latest dot to continue the drawing
+					lastDotCoords = currentDotCoords;
 
-				//Draw line from the last remembered dot to this new dot
-				drawLine(lastDotCoords, currentDotCoords);
+					// highlight the dots
+					dot.classList.add('active');
+				});
 
-				// Track dots coordinates
-				currentShapePoints.push(currentDotCoords);
-
-				//Update the latest dot to continue the drawing
-				lastDotCoords = currentDotCoords;
-
-				// highlight the dots
-				dot.classList.add('active');
-			});
-
-			//Put dot inside wrapper, wrappper into the grid
-			wrapper.appendChild(dot);
-			gridContainer.appendChild(wrapper);
+				//Put dot inside wrapper, wrappper into the grid
+				wrapper.appendChild(dot);
+				gridContainer.appendChild(wrapper);
+			})();
 		}
 
 		// Clear button Logic
-		clearBtn.addEventListener('click', () => {
-			document.querySelectorAll('line').forEach(line => line.remove());
+		clearBtn.addEventListener('click', function() {
+			document.querySelectorAll('line').forEach(function(line) {
+				return line.remove();
+			});
 			
 			// Reset all states back to default mode
 			isDrawing = false;
@@ -166,14 +170,14 @@ define(["sugar-web/activity/activity"], function (activity) {
 		});
 
 		// Undo button Logic
-		undoBtn.addEventListener('click', () => {
+		undoBtn.addEventListener('click', function() {
 			if( undoStack.length > 0 ) {
 				// Force drawing to stop to prevent edge cases
 				isDrawing = false;
 				lastDotCoords = null;
 
 				// Extract the last line from undo stack (line to remove)
-				const lineToRemove = undoStack.pop();
+				var lineToRemove = undoStack.pop();
 
 				// Remove it from the SVG canvas
 				svgCanvas.removeChild(lineToRemove);
@@ -184,14 +188,14 @@ define(["sugar-web/activity/activity"], function (activity) {
 		});
 
 		// Redo button Logic
-		redoBtn.addEventListener('click', () => {
+		redoBtn.addEventListener('click', function() {
 			if ( redoStack.length > 0 ) {
 				// Also force drawing to stop to preven edge cases
 				isDrawing = false;
 				lastDotCoords = null;
 
 				// Extract the last line from redo stack (closest one to redo)
-				const lineToRecreate = redoStack.pop();
+				var lineToRecreate = redoStack.pop();
 
 				// Add it to the SVG canvas
 				svgCanvas.appendChild(lineToRecreate);
