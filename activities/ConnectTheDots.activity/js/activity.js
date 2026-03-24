@@ -18,7 +18,11 @@ define(["sugar-web/activity/activity"], function (activity) {
 		var isDrawing = false;
 		var lastDotCoords = null;
 
-		// History arrays to store drawing history
+		// This tracker is also tracking the points that users go through later to be used to color the enclosed area
+		// drawn by connecting those dots
+		var currentShapePoints = []
+
+		// History arrays to track the lines that users draw
 		var undoStack = [];
 		var redoStack = [];
 
@@ -55,6 +59,7 @@ define(["sugar-web/activity/activity"], function (activity) {
 			// Add it to the screen
 			svgCanvas.appendChild(line);
 
+
 			// Drawing history logic
 			undoStack.push(line); // Every time we draw a new line, save this to undoStack so to undo, just need to delete the latest line
 			redoStack = []; // When draw a new line, can not redo 
@@ -76,13 +81,47 @@ define(["sugar-web/activity/activity"], function (activity) {
 
 			// Click to start/stop drawing
 			dot.addEventListener('click', () => {
+				//Switch drawing mode
 				isDrawing = !isDrawing;
 
 				if(isDrawing) {
 					lastDotCoords = getCoordinates(dot);
+
+					// Add very starting point to the tracker
+					currentShapePoints = [lastDotCoords];
+
 					dot.classList.add('active');
 				} else {
+					const stopDot = getCoordinates(dot);
+
+					console.log( currentShapePoints );
+
+					if ( currentShapePoints.length > 3 ) {
+						const startingDot = currentShapePoints[0];
+
+						// This condition means user has drawn lines to form a shape
+						if( startingDot.x === stopDot.x && startingDot.y === stopDot.y ) {
+
+							// Procedure to create a SVG polygons in web page: give coordinates of points and border + inside color
+							// we already have a svg canvas in html, just need to draw on this
+							const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+
+							//Reformat the dot coordinates to string like this "x-coordinate,y-coordinate"
+							//We got an array like this "x1,y1 x2,y2 x3,y3..."
+							const polygonPoints = currentShapePoints.map( point => `${point.x},${point.y}` ).join(' ');
+
+							polygon.setAttribute('points', polygonPoints);
+							polygon.style.fill = 'rgba(0, 200, 0, 0.4)';
+
+							// Draw on the screen
+							svgCanvas.appendChild(polygon);
+						}
+					}
+
+					//Clear trackers
 					lastDotCoords = null;
+					currentShapePoints = [];
+
 
 					//Remove highlighting dots when stop drawing
 					document.querySelectorAll('.dot.active').forEach(activeDots => {
@@ -101,6 +140,9 @@ define(["sugar-web/activity/activity"], function (activity) {
 
 				//Draw line from the last remembered dot to this new dot
 				drawLine(lastDotCoords, currentDotCoords);
+
+				// Track dots coordinates
+				currentShapePoints.push(currentDotCoords);
 
 				//Update the latest dot to continue the drawing
 				lastDotCoords = currentDotCoords;

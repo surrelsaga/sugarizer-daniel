@@ -21,14 +21,17 @@
   <button class="toolbutton" id="undo-button" title="Undo"></button>
   <button class="toolbutton" id="redo-button" title="Redo"></button>
   <button class="toolbutton" id="clear-button" title="Clear"></button>
+  <!-- <button class="toolbutton" id="changeColor-button" title="Change Color"></button> -->
 
   <button class="toolbutton pull-right" id="stop-button" title="Stop"></button>
 </div>
 
 <div id="canvas">
   <div id="grid-container"></div>
+
   <!-- Add the virtual canvas below and we'll draw straight lines connecting the dots on this canvas not our container
    we lay this canva on top of the container but we'll ignore the mouse event on this canvas  -->
+   <!-- This needs to have svg tag cause without this, we don't have namespace to draw polygons or lines -->
   <svg id="line-canvas"></svg>
 </div>
 </body>

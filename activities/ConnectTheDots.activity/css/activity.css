@@ -14,6 +14,10 @@
   background-image: url(../icons/edit-clear.svg);
 }
 
+/* #main-toolbar #changeColor-button {
+  background-image: url(../icons/paint-board-and-brush.svg);
+} */
+
 #grid-container {
     display: grid;
     /* This automatically creates as many 40px columns as will fit on the screen */
