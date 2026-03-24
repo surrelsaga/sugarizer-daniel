@@ -9,6 +9,12 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 		var gridContainer = document.getElementById('grid-container');
 		var svgCanvas = document.getElementById('line-canvas');
 
+		// Create two SVG layer groups: shapes in back, lines in the front
+		var shapeLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+		var lineLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
+		svgCanvas.appendChild(shapeLayer);
+		svgCanvas.appendChild(lineLayer);
+
 		//BUTTONS
 		var undoBtn = document.getElementById('undo-button');
 		var redoBtn = document.getElementById('redo-button');
@@ -49,6 +55,33 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 		var rows = Math.floor(window.innerHeight / 40);
 		var totalDots = columns * rows;
 
+
+		// Shoelace formula: calculate the geometric area of a drawn polygon from its points
+		function calculateArea(points) {
+			var area = 0;
+			var n = points.length;
+
+			for (var i = 0; i < n; i++) {
+				var j = (i + 1) % n;
+				area += points[i].x * points[j].y;
+				area -= points[j].x * points[i].y;
+			}
+
+			return Math.abs(area / 2);
+		}
+
+		// Sort polygons inside shapeLayer so biggest area is first (back) and smallest is last (upfront)
+		function sortShapeLayer() {
+			var polygons = Array.prototype.slice.call(shapeLayer.querySelectorAll('polygon'));
+			polygons.sort( function(a, b) {
+				return b._area - a._area; // biggest first = rendered behind
+			});
+
+			for (var i = 0; i < polygons.length; i++) {
+				shapeLayer.appendChild(polygons[i]); // reappending moves element to end
+			}
+		}
+
 		// Function to find exact coordinates (x, y) of a dot
 		function getCoordinates(element) {
 			var dotRect = element.getBoundingClientRect();
@@ -76,7 +109,7 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 			line.setAttribute('stroke', currentColor);
 
 			// Add it to the screen
-			svgCanvas.appendChild(line);
+			lineLayer.appendChild(line);
 
 
 			// Collect line into current stroke (will be loaded to undoStack when drawing stops)
@@ -134,8 +167,14 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 								polygon.setAttribute('points', polygonPoints);
 								polygon.style.fill = currentColor;
 
-								// Draw on the screen
-								svgCanvas.appendChild(polygon);
+								// Calculate and store area of polygons for later sorting
+								polygon._area = calculateArea(currentShapePoints);
+
+								// Polygons go into the shape layer (behind line)
+								shapeLayer.appendChild(polygon);
+
+								// Auto-sort so biggest polygon is in the back
+								sortShapeLayer();
 
 								// Track polygon in history so undo/redo works
 								redoStack = [] // When draw a new polygon, can not redo
@@ -199,10 +238,10 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 		clearBtn.addEventListener('click', function() {
 			//Clear all lines and polygons
 			document.querySelectorAll('line').forEach(function(line) {
-				return line.remove();
+				return lineLayer.remove();
 			});
 			document.querySelectorAll('polygon').forEach(function(polygon) {
-				return polygon.remove();
+				return shapeLayer.remove();
 			});
 			
 			// Reset all states back to default mode
@@ -226,13 +265,13 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 
 				if (action.type === 'polygonGroup') {
 					// Remove polygon and all its lines together
-					svgCanvas.removeChild(action.polygon);
+					shapeLayer.removeChild(action.polygon);
 					for(var i = 0; i < action.lines.length; i++) {
-						svgCanvas.removeChild(action.lines[i]);
+						lineLayer.removeChild(action.lines[i]);
 					}
 				} else {
 					// Remove latest individual line
-					svgCanvas.removeChild(action)
+					lineLayer.removeChild(action)
 				}
 				// Save to redo Stack if user want to redo
 				redoStack.push(action);
@@ -251,13 +290,13 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 
 				if (action.type === 'polygonGroup') {
 					// Load polygon and its lines together back
-					svgCanvas.appendChild(action.polygon);
+					shapeLayer.appendChild(action.polygon);
 					for(var i = 0; i < action.lines.length; i++) {
-						svgCanvas.appendChild(action.lines[i]);
+						lineLayer.appendChild(action.lines[i]);
 					}
 				} else {
 					// Load the latest individual line back
-					svgCanvas.appendChild(action)
+					lineLayer.appendChild(action)
 				}
 
 				// Save to undo stack if user want to undo
