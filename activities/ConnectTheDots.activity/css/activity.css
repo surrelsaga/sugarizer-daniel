@@ -14,9 +14,9 @@
   background-image: url(../icons/edit-clear.svg);
 }
 
-/* #main-toolbar #changeColor-button {
-  background-image: url(../icons/paint-board-and-brush.svg);
-} */
+#main-toolbar #changeColor-button {
+  background-image: url(../icons/change-color.svg);
+}
 
 #grid-container {
     display: grid;
@@ -78,7 +78,25 @@
 }
 
 line {
-    stroke: #8c97a7; /* Same color as your dots */
     stroke-width: 2;
     stroke-linecap: round;
+}
+
+/* Styling for the color Palette */
+.color-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 4px;
+    padding: 8px;
+}
+
+.color-item {
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.color-item:hover {
+    border-color: white;
 }

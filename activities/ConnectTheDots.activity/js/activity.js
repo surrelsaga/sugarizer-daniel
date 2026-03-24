@@ -1,4 +1,4 @@
-define(["sugar-web/activity/activity"], function (activity) {
+define(["sugar-web/activity/activity","colorpalette"], function (activity, colorpalette) {
 
 	// Manipulate the DOM only when it is ready.
 	requirejs(['domReady!'], function () {
@@ -13,6 +13,20 @@ define(["sugar-web/activity/activity"], function (activity) {
 		var undoBtn = document.getElementById('undo-button');
 		var redoBtn = document.getElementById('redo-button');
 		var clearBtn = document.getElementById('clear-button');
+
+		// COLOR PALETTE - create and attach to the toolbar button
+		var changeColorPalette = new colorpalette.ColorPalette(
+			document.getElementById('changeColor-button'),
+			"Change Color"
+		);
+
+		// Default drawing color
+		var currentColor = 'rgba(0, 200, 0, 0.4)';
+
+		// Listen for color selection from the palette
+		changeColorPalette.addEventListener('colorChange', function(event) {
+			currentColor = event.color;
+		});
 
 		//State variables
 		var isDrawing = false;
@@ -55,6 +69,8 @@ define(["sugar-web/activity/activity"], function (activity) {
 			line.setAttribute('y1', startCoords.y);
 			line.setAttribute('x2', endCoords.x);
 			line.setAttribute('y2', endCoords.y);
+			//Color the line
+			line.setAttribute('stroke', currentColor);
 
 			// Add it to the screen
 			svgCanvas.appendChild(line);
@@ -112,7 +128,7 @@ define(["sugar-web/activity/activity"], function (activity) {
 								var polygonPoints = currentShapePoints.map( point => `${point.x},${point.y}` ).join(' ');
 
 								polygon.setAttribute('points', polygonPoints);
-								polygon.style.fill = 'rgba(0, 200, 0, 0.4)';
+								polygon.style.fill = currentColor;
 
 								// Draw on the screen
 								svgCanvas.appendChild(polygon);
