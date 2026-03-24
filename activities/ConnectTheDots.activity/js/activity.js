@@ -40,6 +40,9 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 		var undoStack = [];
 		var redoStack = [];
 
+		// Temporary array to collect lines drawn during the current storke
+		var currentStrokeLines = [];
+
 		//calculate how many dots we need to fill the screen
 		//Idea: we create many square wrappers (div) limited to 40x40px -> then put the dots inside (dot: styled divs)
 		var columns = Math.floor(window.innerWidth / 40);
@@ -76,11 +79,8 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 			svgCanvas.appendChild(line);
 
 
-			// Drawing history logic
-			undoStack.push(line); // Every time we draw a new line, save this to undoStack so to undo, just need to devare the latest line
-			redoStack = []; // When draw a new line, can not redo 
-
-			console.log(undoStack);
+			// Collect line into current stroke (will be loaded to undoStack when drawing stops)
+			currentStrokeLines.push(line);
 		}
 
 		//Generate the dots
@@ -102,6 +102,9 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 					isDrawing = !isDrawing;
 
 					if(isDrawing) {
+						// Start a new stroke
+						currentStrokeLines = []
+
 						lastDotCoords = getCoordinates(dot);
 
 						// Add very starting point to the tracker
@@ -110,8 +113,9 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 						dot.classList.add('active');
 					} else {
 						var stopDot = getCoordinates(dot);
+						var formedPolygon = false;
 
-						console.log( currentShapePoints );
+						//#1 scenario: user formed a polygons
 
 						if ( currentShapePoints.length > 3 ) {
 							var startingDot = currentShapePoints[0];
@@ -134,15 +138,28 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 								svgCanvas.appendChild(polygon);
 
 								// Track polygon in history so undo/redo works
-								undoStack.push(polygon);
 								redoStack = [] // When draw a new polygon, can not redo
+								undoStack.push({
+									type: 'polygonGroup',
+									lines: currentStrokeLines.slice(), //shallow copy of the lines
+									polygon: polygon
+								});
+								formedPolygon = true; //confirm formed polygon
 							}
+						}
+
+						// #2 scenario: user hasn't formed a polygon
+						// we'll load lines individually into undoStack so we can undo these lines
+						if(!formedPolygon) {
+							for(var j = 0; j < currentStrokeLines.length; j++) {
+								undoStack.push(currentStrokeLines[j])
+							}
+							redoStack = [];
 						}
 
 						//Clear trackers
 						lastDotCoords = null;
 						currentShapePoints = [];
-
 
 						//Remove highlighting dots when stop drawing
 						document.querySelectorAll('.dot.active').forEach(function(activeDots) {
@@ -191,6 +208,10 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 			// Reset all states back to default mode
 			isDrawing = false;
 			lastDotCoords = null;
+			undoStack = [];
+			redoStack = [];
+			currentShapePoints = [];
+			currentStrokeLines = [];
 		});
 
 		// Undo button Logic
@@ -200,14 +221,21 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 				isDrawing = false;
 				lastDotCoords = null;
 
-				// Extract the last line/polygon from undo stack (line to remove)
-				var elementToRemove = undoStack.pop();
+				// Extract latest element to check if it's formed polygon OR just individual lines (not-form polygon)
+				var action = undoStack.pop();
 
-				// Remove them from the SVG canvas
-				svgCanvas.removeChild(elementToRemove);
-
+				if (action.type === 'polygonGroup') {
+					// Remove polygon and all its lines together
+					svgCanvas.removeChild(action.polygon);
+					for(var i = 0; i < action.lines.length; i++) {
+						svgCanvas.removeChild(action.lines[i]);
+					}
+				} else {
+					// Remove latest individual line
+					svgCanvas.removeChild(action)
+				}
 				// Save to redo Stack if user want to redo
-				redoStack.push(lineToRemove);
+				redoStack.push(action);
 			}
 		});
 
@@ -218,14 +246,22 @@ define(["sugar-web/activity/activity","colorpalette"], function (activity, color
 				isDrawing = false;
 				lastDotCoords = null;
 
-				// Extract the last line/polygon from redo stack (closest one to redo)
-				var elementToRecreate = redoStack.pop();
+				// Extract latest element to check if it's formed polygon OR just individual lines (not-form polygon)
+				var action = redoStack.pop();
 
-				// Add them to the SVG canvas
-				svgCanvas.appendChild(elementToRecreate);
+				if (action.type === 'polygonGroup') {
+					// Load polygon and its lines together back
+					svgCanvas.appendChild(action.polygon);
+					for(var i = 0; i < action.lines.length; i++) {
+						svgCanvas.appendChild(action.lines[i]);
+					}
+				} else {
+					// Load the latest individual line back
+					svgCanvas.appendChild(action)
+				}
 
 				// Save to undo stack if user want to undo
-				undoStack.push(elementToRecreate);
+				undoStack.push(action);
 			}
 		});
 
