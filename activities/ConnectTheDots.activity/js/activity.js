@@ -1,311 +1,318 @@
-define(["sugar-web/activity/activity","colorpalette"], function (activity, colorpalette) {
-
-	// Manipulate the DOM only when it is ready.
-	requirejs(['domReady!'], function () {
-
-		// Initialize the activity.
-		activity.setup();
-
-		var gridContainer = document.getElementById('grid-container');
-		var svgCanvas = document.getElementById('line-canvas');
-
-		// Create two SVG layer groups: shapes in back, lines in the front
-		var shapeLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
-		var lineLayer = document.createElementNS('http://www.w3.org/2000/svg','g');
-		svgCanvas.appendChild(shapeLayer);
-		svgCanvas.appendChild(lineLayer);
-
-		//BUTTONS
-		var undoBtn = document.getElementById('undo-button');
-		var redoBtn = document.getElementById('redo-button');
-		var clearBtn = document.getElementById('clear-button');
-
-		// COLOR PALETTE - create and attach to the toolbar button
-		var changeColorPalette = new colorpalette.ColorPalette(
-			document.getElementById('changeColor-button'),
-			"Change Color"
-		);
-
-		// Default drawing color
-		var currentColor = 'rgba(0, 200, 0, 0.4)';
-
-		// Listen for color selection from the palette
-		changeColorPalette.addEventListener('colorChange', function(event) {
-			currentColor = event.color;
-		});
-
-		//State variables
-		var isDrawing = false;
-		var lastDotCoords = null;
-
-		// This tracker is also tracking the points that users go through later to be used to color the enclosed area
-		// drawn by connecting those dots
-		var currentShapePoints = []
-
-		// History arrays to track the lines that users draw
-		var undoStack = [];
-		var redoStack = [];
-
-		// Temporary array to collect lines drawn during the current storke
-		var currentStrokeLines = [];
-
-		//calculate how many dots we need to fill the screen
-		//Idea: we create many square wrappers (div) limited to 40x40px -> then put the dots inside (dot: styled divs)
-		var columns = Math.floor(window.innerWidth / 40);
-		var rows = Math.floor(window.innerHeight / 40);
-		var totalDots = columns * rows;
-
-
-		// Shoelace formula: calculate the geometric area of a drawn polygon from its points
-		function calculateArea(points) {
-			var area = 0;
-			var n = points.length;
-
-			for (var i = 0; i < n; i++) {
-				var j = (i + 1) % n;
-				area += points[i].x * points[j].y;
-				area -= points[j].x * points[i].y;
-			}
-
-			return Math.abs(area / 2);
-		}
-
-		// Sort polygons inside shapeLayer so biggest area is first (back) and smallest is last (upfront)
-		function sortShapeLayer() {
-			var polygons = Array.prototype.slice.call(shapeLayer.querySelectorAll('polygon'));
-			polygons.sort( function(a, b) {
-				return b._area - a._area; // biggest first = rendered behind
-			});
-
-			for (var i = 0; i < polygons.length; i++) {
-				shapeLayer.appendChild(polygons[i]); // reappending moves element to end
-			}
-		}
-
-		// Function to find exact coordinates (x, y) of a dot
-		function getCoordinates(element) {
-			var dotRect = element.getBoundingClientRect();
-
-			//Get coordinates of the SVG  canvas itself
-			var svgRect = svgCanvas.getBoundingClientRect();
-
-			return {
-				x: (dotRect.left - svgRect.left) + dotRect.width / 2,
-				y: (dotRect.top - svgRect.top) + dotRect.height / 2
-			};
-		}
-
-		// Function to draw the connecting line (SVG line)
-		function drawLine(startCoords, endCoords) {
-			//Create an SVG line element
-			var line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-
-			// Set the starting and ending coordinates
-			line.setAttribute('x1', startCoords.x);
-			line.setAttribute('y1', startCoords.y);
-			line.setAttribute('x2', endCoords.x);
-			line.setAttribute('y2', endCoords.y);
-			//Color the line
-			line.setAttribute('stroke', currentColor);
-
-			// Add it to the screen
-			lineLayer.appendChild(line);
-
-
-			// Collect line into current stroke (will be loaded to undoStack when drawing stops)
-			currentStrokeLines.push(line);
-		}
-
-		//Generate the dots
-		for(var i = 0; i < totalDots; i++) {
-			(function() {  //Have to do this because of ES5, variables declared by var can still be used outside the scope
-				//Create invisible wrappers
-				var wrapper = document.createElement('div');
-				wrapper.classList.add('dot-wrapper');
-
-				//Create visibile dots
-				var dot = document.createElement('div');
-				dot.classList.add('dot');
-
-				// Drawing connecting straight lines logic
-
-				// Click to start/stop drawing
-				dot.addEventListener('click', function() {
-					//Switch drawing mode
-					isDrawing = !isDrawing;
-
-					if(isDrawing) {
-						// Start a new stroke
-						currentStrokeLines = []
-
-						lastDotCoords = getCoordinates(dot);
-
-						// Add very starting point to the tracker
-						currentShapePoints = [lastDotCoords];
-
-						dot.classList.add('active');
-					} else {
-						var stopDot = getCoordinates(dot);
-						var formedPolygon = false;
-
-						//#1 scenario: user formed a polygons
-
-						if ( currentShapePoints.length > 3 ) {
-							var startingDot = currentShapePoints[0];
-
-							// This condition means user has drawn lines to form a shape
-							if( startingDot.x === stopDot.x && startingDot.y === stopDot.y ) {
-
-								// Procedure to create a SVG polygons in web page: give coordinates of points and border + inside color
-								// we already have a svg canvas in html, just need to draw on this
-								var polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-
-								//Reformat the dot coordinates to string like this "x-coordinate,y-coordinate"
-								//We got an array like this "x1,y1 x2,y2 x3,y3..."
-								var polygonPoints = currentShapePoints.map( point => `${point.x},${point.y}` ).join(' ');
-
-								polygon.setAttribute('points', polygonPoints);
-								polygon.style.fill = currentColor;
-
-								// Calculate and store area of polygons for later sorting
-								polygon._area = calculateArea(currentShapePoints);
-
-								// Polygons go into the shape layer (behind line)
-								shapeLayer.appendChild(polygon);
-
-								// Auto-sort so biggest polygon is in the back
-								sortShapeLayer();
-
-								// Track polygon in history so undo/redo works
-								redoStack = [] // When draw a new polygon, can not redo
-								undoStack.push({
-									type: 'polygonGroup',
-									lines: currentStrokeLines.slice(), //shallow copy of the lines
-									polygon: polygon
-								});
-								formedPolygon = true; //confirm formed polygon
-							}
-						}
-
-						// #2 scenario: user hasn't formed a polygon
-						// we'll load lines individually into undoStack so we can undo these lines
-						if(!formedPolygon) {
-							for(var j = 0; j < currentStrokeLines.length; j++) {
-								undoStack.push(currentStrokeLines[j])
-							}
-							redoStack = [];
-						}
-
-						//Clear trackers
-						lastDotCoords = null;
-						currentShapePoints = [];
-
-						//Remove highlighting dots when stop drawing
-						document.querySelectorAll('.dot.active').forEach(function(activeDots) {
-							activeDots.classList.remove('active');
-						});
-					}
-				});
-
-				// Drag to another dot to draw lines
-				dot.addEventListener('mouseenter', function() {
-					// If we're not in drawing mode, we ignore and don't do anything
-					if(!isDrawing) return;
-					
-					// Get coordinates of the wrapper we just enter;
-					var currentDotCoords = getCoordinates(dot);
-
-					//Draw line from the last remembered dot to this new dot
-					drawLine(lastDotCoords, currentDotCoords);
-
-					// Track dots coordinates
-					currentShapePoints.push(currentDotCoords);
-
-					//Update the latest dot to continue the drawing
-					lastDotCoords = currentDotCoords;
-
-					// highlight the dots
-					dot.classList.add('active');
-				});
-
-				//Put dot inside wrapper, wrappper into the grid
-				wrapper.appendChild(dot);
-				gridContainer.appendChild(wrapper);
-			})();
-		}
-
-		// Clear button Logic
-		clearBtn.addEventListener('click', function() {
-			//Clear all lines and polygons
-			document.querySelectorAll('line').forEach(function(line) {
-				return lineLayer.removeChild(line);
-			});
-			document.querySelectorAll('polygon').forEach(function(polygon) {
-				return shapeLayer.removeChild(polygon)
-			});
-			
-			// Reset all states back to default mode
-			isDrawing = false;
-			lastDotCoords = null;
-			undoStack = [];
-			redoStack = [];
-			currentShapePoints = [];
-			currentStrokeLines = [];
-		});
-
-		// Undo button Logic
-		undoBtn.addEventListener('click', function() {
-			if( undoStack.length > 0 ) {
-				// Force drawing to stop to prevent edge cases
-				isDrawing = false;
-				lastDotCoords = null;
-
-				// Extract latest element to check if it's formed polygon OR just individual lines (not-form polygon)
-				var action = undoStack.pop();
-
-				if (action.type === 'polygonGroup') {
-					// Remove polygon and all its lines together
-					shapeLayer.removeChild(action.polygon);
-					for(var i = 0; i < action.lines.length; i++) {
-						lineLayer.removeChild(action.lines[i]);
-					}
-				} else {
-					// Remove latest individual line
-					lineLayer.removeChild(action)
-				}
-				// Save to redo Stack if user want to redo
-				redoStack.push(action);
-			}
-		});
-
-		// Redo button Logic
-		redoBtn.addEventListener('click', function() {
-			if ( redoStack.length > 0 ) {
-				// Also force drawing to stop to preven edge cases
-				isDrawing = false;
-				lastDotCoords = null;
-
-				// Extract latest element to check if it's formed polygon OR just individual lines (not-form polygon)
-				var action = redoStack.pop();
-
-				if (action.type === 'polygonGroup') {
-					// Load polygon and its lines together back
-					shapeLayer.appendChild(action.polygon);
-					//Re-sort the polygons
-					sortShapeLayer();
-					for(var i = 0; i < action.lines.length; i++) {
-						lineLayer.appendChild(action.lines[i]);
-					}
-				} else {
-					// Load the latest individual line back
-					lineLayer.appendChild(action)
-				}
-
-				// Save to undo stack if user want to undo
-				undoStack.push(action);
-			}
-		});
-
-	});
-
+define(["sugar-web/activity/activity", "colorpalette"], function (activity, colorpalette) {
+
+    requirejs(["domReady!"], function () {
+        activity.setup();
+
+        var gridContainer = document.getElementById("grid-container");
+        var svgCanvas = document.getElementById("line-canvas");
+
+        var drawModeBtn = document.getElementById("drawMode-button");
+        var numberModeBtn = document.getElementById("numberMode-button");
+        var undoBtn = document.getElementById("undo-button");
+        var redoBtn = document.getElementById("redo-button");
+        var clearBtn = document.getElementById("clear-button");
+        var changeColorBtn = document.getElementById("changeColor-button");
+
+        var changeColorPalette = new colorpalette.ColorPalette(
+            changeColorBtn,
+            "Change Color"
+        );
+
+        var currentMode = null;
+        var cleanupCurrentMode = null;
+
+        function switchMode(nextMode) {
+            if (cleanupCurrentMode) {
+                cleanupCurrentMode();
+                cleanupCurrentMode = null;
+            }
+
+            if (nextMode === "draw") {
+                cleanupCurrentMode = startDrawMode();
+            } else if (nextMode === "number") {
+                cleanupCurrentMode = startNumberMode();
+            }
+
+            currentMode = nextMode;
+            updateToolbarState();
+        }
+
+        function updateToolbarState() {
+            drawModeBtn.classList.toggle("active", currentMode === "draw");
+            numberModeBtn.classList.toggle("active", currentMode === "number");
+        }
+
+        function startDrawMode() {
+            var shapeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            var lineLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            svgCanvas.appendChild(shapeLayer);
+            svgCanvas.appendChild(lineLayer);
+
+            var currentColor = "rgba(0, 200, 0, 0.4)";
+            var isDrawing = false;
+            var lastDotCoords = null;
+            var currentShapePoints = [];
+            var undoStack = [];
+            var redoStack = [];
+            var currentStrokeLines = [];
+            var generatedWrappers = [];
+
+            function onColorChange(event) {
+                currentColor = event.color;
+            }
+
+            function calculateArea(points) {
+                var area = 0;
+                var n = points.length;
+                for (var i = 0; i < n; i++) {
+                    var j = (i + 1) % n;
+                    area += points[i].x * points[j].y;
+                    area -= points[j].x * points[i].y;
+                }
+                return Math.abs(area / 2);
+            }
+
+            function sortShapeLayer() {
+                var polygons = Array.prototype.slice.call(shapeLayer.querySelectorAll("polygon"));
+                polygons.sort(function (a, b) {
+                    return b._area - a._area;
+                });
+
+                for (var i = 0; i < polygons.length; i++) {
+                    shapeLayer.appendChild(polygons[i]);
+                }
+            }
+
+            function getCoordinates(element) {
+                var dotRect = element.getBoundingClientRect();
+                var svgRect = svgCanvas.getBoundingClientRect();
+
+                return {
+                    x: (dotRect.left - svgRect.left) + dotRect.width / 2,
+                    y: (dotRect.top - svgRect.top) + dotRect.height / 2
+                };
+            }
+
+            function drawLine(startCoords, endCoords) {
+                var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", startCoords.x);
+                line.setAttribute("y1", startCoords.y);
+                line.setAttribute("x2", endCoords.x);
+                line.setAttribute("y2", endCoords.y);
+                line.setAttribute("stroke", currentColor);
+
+                lineLayer.appendChild(line);
+                currentStrokeLines.push(line);
+            }
+
+            function clearActiveDots() {
+                document.querySelectorAll(".dot.active").forEach(function (activeDot) {
+                    activeDot.classList.remove("active");
+                });
+            }
+
+            function onUndo() {
+                if (undoStack.length === 0) {
+                    return;
+                }
+
+                isDrawing = false;
+                lastDotCoords = null;
+
+                var action = undoStack.pop();
+
+                if (action.type === "polygonGroup") {
+                    if (action.polygon.parentNode === shapeLayer) {
+                        shapeLayer.removeChild(action.polygon);
+                    }
+                    for (var i = 0; i < action.lines.length; i++) {
+                        if (action.lines[i].parentNode === lineLayer) {
+                            lineLayer.removeChild(action.lines[i]);
+                        }
+                    }
+                } else {
+                    if (action.parentNode === lineLayer) {
+                        lineLayer.removeChild(action);
+                    }
+                }
+
+                redoStack.push(action);
+            }
+
+            function onRedo() {
+                if (redoStack.length === 0) {
+                    return;
+                }
+
+                isDrawing = false;
+                lastDotCoords = null;
+
+                var action = redoStack.pop();
+
+                if (action.type === "polygonGroup") {
+                    for (var i = 0; i < action.lines.length; i++) {
+                        lineLayer.appendChild(action.lines[i]);
+                    }
+                    shapeLayer.appendChild(action.polygon);
+                    sortShapeLayer();
+                } else {
+                    lineLayer.appendChild(action);
+                }
+
+                undoStack.push(action);
+            }
+
+            function onClear() {
+                while (shapeLayer.firstChild) {
+                    shapeLayer.removeChild(shapeLayer.firstChild);
+                }
+
+                while (lineLayer.firstChild) {
+                    lineLayer.removeChild(lineLayer.firstChild);
+                }
+
+                isDrawing = false;
+                lastDotCoords = null;
+                currentShapePoints = [];
+                currentStrokeLines = [];
+                undoStack = [];
+                redoStack = [];
+                clearActiveDots();
+            }
+
+            function createDotGrid() {
+                var columns = Math.floor(window.innerWidth / 40);
+                var rows = Math.floor(window.innerHeight / 40);
+                var totalDots = columns * rows;
+
+                for (var i = 0; i < totalDots; i++) {
+                    (function () {
+                        var wrapper = document.createElement("div");
+                        wrapper.classList.add("dot-wrapper");
+
+                        var dot = document.createElement("div");
+                        dot.classList.add("dot");
+
+                        function onDotClick() {
+                            isDrawing = !isDrawing;
+
+                            if (isDrawing) {
+                                currentStrokeLines = [];
+                                lastDotCoords = getCoordinates(dot);
+                                currentShapePoints = [lastDotCoords];
+                                dot.classList.add("active");
+                                return;
+                            }
+
+                            var stopDot = getCoordinates(dot);
+                            var formedPolygon = false;
+
+                            if (currentShapePoints.length > 3) {
+                                var startingDot = currentShapePoints[0];
+
+                                if (startingDot.x === stopDot.x && startingDot.y === stopDot.y) {
+                                    var polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                                    var polygonPoints = currentShapePoints.map(function (point) {
+                                        return point.x + "," + point.y;
+                                    }).join(" ");
+
+                                    polygon.setAttribute("points", polygonPoints);
+                                    polygon.style.fill = currentColor;
+                                    polygon._area = calculateArea(currentShapePoints);
+
+                                    shapeLayer.appendChild(polygon);
+                                    sortShapeLayer();
+
+                                    undoStack.push({
+                                        type: "polygonGroup",
+                                        lines: currentStrokeLines.slice(),
+                                        polygon: polygon
+                                    });
+                                    redoStack = [];
+                                    formedPolygon = true;
+                                }
+                            }
+
+                            if (!formedPolygon) {
+                                for (var j = 0; j < currentStrokeLines.length; j++) {
+                                    undoStack.push(currentStrokeLines[j]);
+                                }
+                                redoStack = [];
+                            }
+
+                            lastDotCoords = null;
+                            currentShapePoints = [];
+                            currentStrokeLines = [];
+                            clearActiveDots();
+                        }
+
+                        function onDotEnter() {
+                            if (!isDrawing) {
+                                return;
+                            }
+
+                            var currentDotCoords = getCoordinates(dot);
+                            drawLine(lastDotCoords, currentDotCoords);
+                            currentShapePoints.push(currentDotCoords);
+                            lastDotCoords = currentDotCoords;
+                            dot.classList.add("active");
+                        }
+
+                        dot.addEventListener("click", onDotClick);
+                        dot.addEventListener("mouseenter", onDotEnter);
+
+                        wrapper.appendChild(dot);
+                        gridContainer.appendChild(wrapper);
+                        generatedWrappers.push(wrapper);
+                    })();
+                }
+            }
+
+            changeColorPalette.addEventListener("colorChange", onColorChange);
+            undoBtn.addEventListener("click", onUndo);
+            redoBtn.addEventListener("click", onRedo);
+            clearBtn.addEventListener("click", onClear);
+
+            createDotGrid();
+
+            return function stopDrawMode() {
+                changeColorPalette.getPalette().removeEventListener("colorChange", onColorChange);
+                undoBtn.removeEventListener("click", onUndo);
+                redoBtn.removeEventListener("click", onRedo);
+                clearBtn.removeEventListener("click", onClear);
+
+                clearActiveDots();
+
+                for (var i = 0; i < generatedWrappers.length; i++) {
+                    if (generatedWrappers[i].parentNode === gridContainer) {
+                        gridContainer.removeChild(generatedWrappers[i]);
+                    }
+                }
+
+                if (shapeLayer.parentNode === svgCanvas) {
+                    svgCanvas.removeChild(shapeLayer);
+                }
+                if (lineLayer.parentNode === svgCanvas) {
+                    svgCanvas.removeChild(lineLayer);
+                }
+            };
+        }
+
+        function startNumberMode() {
+            function stopNumberMode() {
+            }
+
+            return stopNumberMode;
+        }
+
+        drawModeBtn.addEventListener("click", function () {
+            switchMode("draw");
+        });
+
+        numberModeBtn.addEventListener("click", function () {
+            switchMode("number");
+        });
+
+        updateToolbarState();
+    });
 });

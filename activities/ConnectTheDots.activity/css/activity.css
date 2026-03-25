@@ -18,6 +18,14 @@
   background-image: url(../icons/change-color.svg);
 }
 
+#main-toolbar #drawMode-button {
+   background-image: url(../icons/draw-mode.svg);
+}
+
+#main-toolbar #numberMode-button {
+   background-image: url(../icons/number-mode.svg);
+}
+
 #grid-container {
     display: grid;
     /* This automatically creates as many 40px columns as will fit on the screen */
