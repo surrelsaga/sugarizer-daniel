@@ -1,4 +1,4 @@
-define(["sugar-web/activity/activity", "sugar-web/env", "colorpalette"], function (activity, env, colorpalette) {
+define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/presencepalette", "colorpalette"], function (activity, env, presencepalette, colorpalette) {
 
     requirejs(["domReady!"], function () {
         activity.setup();
@@ -16,6 +16,12 @@ define(["sugar-web/activity/activity", "sugar-web/env", "colorpalette"], functio
         var changeColorPalette = new colorpalette.ColorPalette(
             changeColorBtn,
             "Change Color"
+        );
+
+        // Link presence palette
+        var palette = new presencepalette.PresencePalette(
+            document.getElementById('network-button'),
+            undefined
         );
 
         var currentMode = null;
@@ -410,7 +416,7 @@ define(["sugar-web/activity/activity", "sugar-web/env", "colorpalette"], functio
             if (!environment.objectId) {
                 // New instance — start draw mode with empty canvas
                 console.log("New instance");
-                switchMode("draw");
+                switchMode("draw"); //This is why the starting UI of the activity is draw mode UI
             } else {
                 // Existing instance — load saved data then start draw mode
                 activity.getDatastoreObject().loadAsText(function (error, metadata, data) {
