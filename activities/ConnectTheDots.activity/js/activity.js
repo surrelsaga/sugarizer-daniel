@@ -31,7 +31,7 @@ define(["sugar-web/activity/activity", "sugar-web/env", "colorpalette"], functio
             }
 
             if (nextMode === "draw") {
-                cleanupCurrentMode = startDrawMode();
+                cleanupCurrentMode = startDrawMode(drawHistory);
             } else if (nextMode === "number") {
                 cleanupCurrentMode = startNumberMode();
             }
