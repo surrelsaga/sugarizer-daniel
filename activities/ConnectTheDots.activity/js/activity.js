@@ -1,4 +1,4 @@
-define(["sugar-web/activity/activity", "colorpalette"], function (activity, colorpalette) {
+define(["sugar-web/activity/activity", "sugar-web/env", "colorpalette"], function (activity, env, colorpalette) {
 
     requirejs(["domReady!"], function () {
         activity.setup();
@@ -21,6 +21,9 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
         var currentMode = null;
         var cleanupCurrentMode = null;
 
+        // Serializable history for saving to datastore
+        var drawHistory = [];
+
         function switchMode(nextMode) {
             if (cleanupCurrentMode) {
                 cleanupCurrentMode();
@@ -42,7 +45,7 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
             numberModeBtn.classList.toggle("active", currentMode === "number");
         }
 
-        function startDrawMode() {
+        function startDrawMode(savedData) {
             var shapeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
             var lineLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
             svgCanvas.appendChild(shapeLayer);
@@ -77,7 +80,6 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                 polygons.sort(function (a, b) {
                     return b._area - a._area;
                 });
-
                 for (var i = 0; i < polygons.length; i++) {
                     shapeLayer.appendChild(polygons[i]);
                 }
@@ -86,22 +88,39 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
             function getCoordinates(element) {
                 var dotRect = element.getBoundingClientRect();
                 var svgRect = svgCanvas.getBoundingClientRect();
-
                 return {
                     x: (dotRect.left - svgRect.left) + dotRect.width / 2,
                     y: (dotRect.top - svgRect.top) + dotRect.height / 2
                 };
             }
 
-            function drawLine(startCoords, endCoords) {
+            // Create an SVG line from coordinate data and add to lineLayer
+            function createLine(x1, y1, x2, y2, color) {
                 var line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                line.setAttribute("x1", startCoords.x);
-                line.setAttribute("y1", startCoords.y);
-                line.setAttribute("x2", endCoords.x);
-                line.setAttribute("y2", endCoords.y);
-                line.setAttribute("stroke", currentColor);
-
+                line.setAttribute("x1", x1);
+                line.setAttribute("y1", y1);
+                line.setAttribute("x2", x2);
+                line.setAttribute("y2", y2);
+                line.setAttribute("stroke", color);
                 lineLayer.appendChild(line);
+                return line;
+            }
+
+            // Create an SVG polygon from points data and add to shapeLayer
+            function createPolygon(points, color) {
+                var polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                var polygonPoints = points.map(function (point) {
+                    return point.x + "," + point.y;
+                }).join(" ");
+                polygon.setAttribute("points", polygonPoints);
+                polygon.style.fill = color;
+                polygon._area = calculateArea(points);
+                shapeLayer.appendChild(polygon);
+                return polygon;
+            }
+
+            function drawLine(startCoords, endCoords) {
+                var line = createLine(startCoords.x, startCoords.y, endCoords.x, endCoords.y, currentColor);
                 currentStrokeLines.push(line);
             }
 
@@ -112,10 +131,7 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
             }
 
             function onUndo() {
-                if (undoStack.length === 0) {
-                    return;
-                }
-
+                if (undoStack.length === 0) return;
                 isDrawing = false;
                 lastDotCoords = null;
 
@@ -136,14 +152,13 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                     }
                 }
 
+                // Remove last entry from serializable history
+                drawHistory.pop();
                 redoStack.push(action);
             }
 
             function onRedo() {
-                if (redoStack.length === 0) {
-                    return;
-                }
-
+                if (redoStack.length === 0) return;
                 isDrawing = false;
                 lastDotCoords = null;
 
@@ -155,21 +170,45 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                     }
                     shapeLayer.appendChild(action.polygon);
                     sortShapeLayer();
+
+                    // Re-add to serializable history
+                    var lineDataArr = [];
+                    for (var k = 0; k < action.lines.length; k++) {
+                        var l = action.lines[k];
+                        lineDataArr.push({
+                            x1: parseFloat(l.getAttribute("x1")),
+                            y1: parseFloat(l.getAttribute("y1")),
+                            x2: parseFloat(l.getAttribute("x2")),
+                            y2: parseFloat(l.getAttribute("y2")),
+                            color: l.getAttribute("stroke")
+                        });
+                    }
+                    drawHistory.push({
+                        type: "polygonGroup",
+                        lines: lineDataArr,
+                        points: action._savedPoints,
+                        color: action.polygon.style.fill
+                    });
                 } else {
                     lineLayer.appendChild(action);
+
+                    // Re-add to serializable history
+                    drawHistory.push({
+                        type: "line",
+                        x1: parseFloat(action.getAttribute("x1")),
+                        y1: parseFloat(action.getAttribute("y1")),
+                        x2: parseFloat(action.getAttribute("x2")),
+                        y2: parseFloat(action.getAttribute("y2")),
+                        color: action.getAttribute("stroke")
+                    });
                 }
 
                 undoStack.push(action);
             }
 
             function onClear() {
-                while (shapeLayer.firstChild) {
-                    shapeLayer.removeChild(shapeLayer.firstChild);
-                }
-
-                while (lineLayer.firstChild) {
-                    lineLayer.removeChild(lineLayer.firstChild);
-                }
+                while (shapeLayer.firstChild) shapeLayer.removeChild(shapeLayer.firstChild);
+                while (lineLayer.firstChild) lineLayer.removeChild(lineLayer.firstChild);
 
                 isDrawing = false;
                 lastDotCoords = null;
@@ -177,6 +216,7 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                 currentStrokeLines = [];
                 undoStack = [];
                 redoStack = [];
+                drawHistory = [];
                 clearActiveDots();
             }
 
@@ -211,24 +251,39 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                                 var startingDot = currentShapePoints[0];
 
                                 if (startingDot.x === stopDot.x && startingDot.y === stopDot.y) {
-                                    var polygon = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
-                                    var polygonPoints = currentShapePoints.map(function (point) {
-                                        return point.x + "," + point.y;
-                                    }).join(" ");
-
-                                    polygon.setAttribute("points", polygonPoints);
-                                    polygon.style.fill = currentColor;
-                                    polygon._area = calculateArea(currentShapePoints);
-
-                                    shapeLayer.appendChild(polygon);
+                                    var polygon = createPolygon(currentShapePoints, currentColor);
                                     sortShapeLayer();
 
-                                    undoStack.push({
+                                    // Save line data for serialization
+                                    var lineDataArr = [];
+                                    for (var k = 0; k < currentStrokeLines.length; k++) {
+                                        var l = currentStrokeLines[k];
+                                        lineDataArr.push({
+                                            x1: parseFloat(l.getAttribute("x1")),
+                                            y1: parseFloat(l.getAttribute("y1")),
+                                            x2: parseFloat(l.getAttribute("x2")),
+                                            y2: parseFloat(l.getAttribute("y2")),
+                                            color: l.getAttribute("stroke")
+                                        });
+                                    }
+
+                                    var actionObj = {
                                         type: "polygonGroup",
                                         lines: currentStrokeLines.slice(),
-                                        polygon: polygon
-                                    });
+                                        polygon: polygon,
+                                        _savedPoints: currentShapePoints.slice()
+                                    };
+                                    undoStack.push(actionObj);
                                     redoStack = [];
+
+                                    // Push serializable version to drawHistory
+                                    drawHistory.push({
+                                        type: "polygonGroup",
+                                        lines: lineDataArr,
+                                        points: currentShapePoints.slice(),
+                                        color: currentColor
+                                    });
+
                                     formedPolygon = true;
                                 }
                             }
@@ -236,6 +291,17 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                             if (!formedPolygon) {
                                 for (var j = 0; j < currentStrokeLines.length; j++) {
                                     undoStack.push(currentStrokeLines[j]);
+
+                                    // Push each line as serializable data
+                                    var ln = currentStrokeLines[j];
+                                    drawHistory.push({
+                                        type: "line",
+                                        x1: parseFloat(ln.getAttribute("x1")),
+                                        y1: parseFloat(ln.getAttribute("y1")),
+                                        x2: parseFloat(ln.getAttribute("x2")),
+                                        y2: parseFloat(ln.getAttribute("y2")),
+                                        color: ln.getAttribute("stroke")
+                                    });
                                 }
                                 redoStack = [];
                             }
@@ -247,10 +313,7 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                         }
 
                         function onDotEnter() {
-                            if (!isDrawing) {
-                                return;
-                            }
-
+                            if (!isDrawing) return;
                             var currentDotCoords = getCoordinates(dot);
                             drawLine(lastDotCoords, currentDotCoords);
                             currentShapePoints.push(currentDotCoords);
@@ -268,6 +331,33 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                 }
             }
 
+            // Rebuild drawing from saved data (when resuming from journal)
+            function loadFromData(data) {
+                for (var i = 0; i < data.length; i++) {
+                    var entry = data[i];
+
+                    if (entry.type === "line") {
+                        var line = createLine(entry.x1, entry.y1, entry.x2, entry.y2, entry.color);
+                        undoStack.push(line);
+                    } else if (entry.type === "polygonGroup") {
+                        var lines = [];
+                        for (var j = 0; j < entry.lines.length; j++) {
+                            var ld = entry.lines[j];
+                            lines.push(createLine(ld.x1, ld.y1, ld.x2, ld.y2, ld.color));
+                        }
+                        var polygon = createPolygon(entry.points, entry.color);
+                        undoStack.push({
+                            type: "polygonGroup",
+                            lines: lines,
+                            polygon: polygon,
+                            _savedPoints: entry.points.slice()
+                        });
+                    }
+                }
+                sortShapeLayer();
+                drawHistory = data.slice();
+            }
+
             changeColorPalette.addEventListener("colorChange", onColorChange);
             undoBtn.addEventListener("click", onUndo);
             redoBtn.addEventListener("click", onRedo);
@@ -275,12 +365,16 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
 
             createDotGrid();
 
+            // If saved data was passed in, rebuild the drawing
+            if (savedData && savedData.length > 0) {
+                loadFromData(savedData);
+            }
+
             return function stopDrawMode() {
                 changeColorPalette.getPalette().removeEventListener("colorChange", onColorChange);
                 undoBtn.removeEventListener("click", onUndo);
                 redoBtn.removeEventListener("click", onRedo);
                 clearBtn.removeEventListener("click", onClear);
-
                 clearActiveDots();
 
                 for (var i = 0; i < generatedWrappers.length; i++) {
@@ -289,21 +383,48 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
                     }
                 }
 
-                if (shapeLayer.parentNode === svgCanvas) {
-                    svgCanvas.removeChild(shapeLayer);
-                }
-                if (lineLayer.parentNode === svgCanvas) {
-                    svgCanvas.removeChild(lineLayer);
-                }
+                if (shapeLayer.parentNode === svgCanvas) svgCanvas.removeChild(shapeLayer);
+                if (lineLayer.parentNode === svgCanvas) svgCanvas.removeChild(lineLayer);
             };
         }
 
         function startNumberMode() {
-            function stopNumberMode() {
-            }
-
-            return stopNumberMode;
+            return function stopNumberMode() {};
         }
+
+        // ===== DATASTORE: Save on stop =====
+        document.getElementById("stop-button").addEventListener("click", function () {
+            var jsonData = JSON.stringify(drawHistory);
+            activity.getDatastoreObject().setDataAsText(jsonData);
+            activity.getDatastoreObject().save(function (error) {
+                if (error === null) {
+                    console.log("write done.");
+                } else {
+                    console.log("write failed.");
+                }
+            });
+        });
+
+        // ===== DATASTORE: Load on start =====
+        env.getEnvironment(function (err, environment) {
+            if (!environment.objectId) {
+                // New instance — start draw mode with empty canvas
+                console.log("New instance");
+                switchMode("draw");
+            } else {
+                // Existing instance — load saved data then start draw mode
+                activity.getDatastoreObject().loadAsText(function (error, metadata, data) {
+                    if (error === null && data !== null) {
+                        var savedData = JSON.parse(data);
+                        cleanupCurrentMode = startDrawMode(savedData);
+                        currentMode = "draw";
+                        updateToolbarState();
+                    } else {
+                        switchMode("draw");
+                    }
+                });
+            }
+        });
 
         drawModeBtn.addEventListener("click", function () {
             switchMode("draw");
@@ -312,7 +433,5 @@ define(["sugar-web/activity/activity", "colorpalette"], function (activity, colo
         numberModeBtn.addEventListener("click", function () {
             switchMode("number");
         });
-
-        updateToolbarState();
     });
 });
