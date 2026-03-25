@@ -118,6 +118,19 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/pres
             }
         }
 
+        // Broadcast full state (used by undo/redo/clear)
+        function sendFullState() {
+            if (presence) {
+                presence.sendMessage(presence.getSharedInfo().id, {
+                    user: presence.getUserInfo(),
+                    content: {
+                        action: 'init',
+                        data: drawHistory
+                    }
+                });
+            }
+        }
+
         function switchMode(nextMode) {
             if (cleanupCurrentMode) {
                 cleanupCurrentMode();
@@ -252,6 +265,7 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/pres
                 // Remove last entry from serializable history
                 drawHistory.pop();
                 redoStack.push(action);
+                sendFullState(); //work in multiplayer
             }
 
             function onRedo() {
@@ -301,6 +315,7 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/pres
                 }
 
                 undoStack.push(action);
+                sendFullState(); //work in multiplayer
             }
 
             function onClear() {
@@ -315,6 +330,7 @@ define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/pres
                 redoStack = [];
                 drawHistory = [];
                 clearActiveDots();
+                sendFullState(); //work in multiplayer
             }
 
             function createDotGrid() {
