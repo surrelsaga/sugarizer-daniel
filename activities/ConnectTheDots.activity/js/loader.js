@@ -1,7 +1,9 @@
 requirejs.config({
     baseUrl: "lib",
     paths: {
-        activity: "../js"
+        activity: "../js",
+        drawmode: "../js/drawmode",
+        numbermode: "../js/numbermode"
     }
 });
 
