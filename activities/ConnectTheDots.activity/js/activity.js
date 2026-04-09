@@ -1,5 +1,5 @@
 define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/presencepalette", "colorpalette", "drawmode", "numbermode"],
-function (activity, env, presencepalette, colorpalette, drawmode, numbermode) {
+function (activity, env, presencepalette, colorpalette, drawmode, numbermode, gamemode) {
 
     requirejs(["domReady!"], function () {
         activity.setup();

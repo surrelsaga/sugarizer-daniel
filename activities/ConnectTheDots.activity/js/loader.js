@@ -3,7 +3,8 @@ requirejs.config({
     paths: {
         activity: "../js",
         drawmode: "../js/drawmode",
-        numbermode: "../js/numbermode"
+        numbermode: "../js/numbermode",
+        gamemode: "../js/gamemode"
     }
 });
 
