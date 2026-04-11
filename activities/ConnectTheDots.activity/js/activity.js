@@ -1,4 +1,4 @@
-define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/presencepalette", "colorpalette", "drawmode", "numbermode"],
+define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/presencepalette", "colorpalette", "drawmode", "numbermode","gamemode"],
 function (activity, env, presencepalette, colorpalette, drawmode, numbermode, gamemode) {
 
     requirejs(["domReady!"], function () {
@@ -9,6 +9,7 @@ function (activity, env, presencepalette, colorpalette, drawmode, numbermode, ga
 
         var drawModeBtn = document.getElementById("drawMode-button");
         var numberModeBtn = document.getElementById("numberMode-button");
+        var gameModeBtn = document.getElementById("gameMode-button");
         var undoBtn = document.getElementById("undo-button");
         var redoBtn = document.getElementById("redo-button");
         var clearBtn = document.getElementById("clear-button");
@@ -158,6 +159,8 @@ function (activity, env, presencepalette, colorpalette, drawmode, numbermode, ga
                 cleanupCurrentMode = drawmode(config, savedCopy);
             } else if (nextMode === "number") {
                 cleanupCurrentMode = numbermode(config);
+            } else if (nextMode === "game") {
+                cleanupCurrentMode = gamemode(config);
             }
 
             currentMode = nextMode;
@@ -167,6 +170,7 @@ function (activity, env, presencepalette, colorpalette, drawmode, numbermode, ga
         function updateToolbarState() {
             drawModeBtn.classList.toggle("active", currentMode === "draw");
             numberModeBtn.classList.toggle("active", currentMode === "number");
+            gameModeBtn.classList.toggle("active", currentMode === "game");
         }
 
         //  DATASTORE: Save on stop button
@@ -220,5 +224,9 @@ function (activity, env, presencepalette, colorpalette, drawmode, numbermode, ga
         numberModeBtn.addEventListener("click", function () {
             switchMode("number");
         });
+
+        gameModeBtn.addEventListener('click', function() {
+            switchMode("game");
+        })
     });
 });
