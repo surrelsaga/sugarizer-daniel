@@ -18,6 +18,10 @@
   background-image: url(../icons/change-color.svg);
 }
 
+#main-toolbar #changeShape-button {
+  background-image: url(../icons/change-shape.svg);
+}
+
 #main-toolbar #drawMode-button {
    background-image: url(../icons/draw-mode.svg);
 }

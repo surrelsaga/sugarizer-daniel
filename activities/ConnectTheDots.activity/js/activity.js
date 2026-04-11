@@ -1,5 +1,5 @@
-define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/presencepalette", "colorpalette", "drawmode", "numbermode","gamemode"],
-function (activity, env, presencepalette, colorpalette, drawmode, numbermode, gamemode) {
+define(["sugar-web/activity/activity", "sugar-web/env", "sugar-web/graphics/presencepalette", "colorpalette", "shapepalette", "drawmode", "numbermode","gamemode"],
+function (activity, env, presencepalette, colorpalette, shapepalette, drawmode, numbermode, gamemode) {
 
     requirejs(["domReady!"], function () {
         activity.setup();
@@ -14,10 +14,17 @@ function (activity, env, presencepalette, colorpalette, drawmode, numbermode, ga
         var redoBtn = document.getElementById("redo-button");
         var clearBtn = document.getElementById("clear-button");
         var changeColorBtn = document.getElementById("changeColor-button");
+        var changeShapeBtn = document.getElementById("changeShape-button");
 
+        // Special palettes
         var changeColorPalette = new colorpalette.ColorPalette(
             changeColorBtn,
             "Change Color"
+        );
+
+        var changeShapePalette = new shapepalette.ShapePalette(
+            changeShapeBtn,
+            "Change Shape"
         );
 
         // Link presence palette
@@ -158,7 +165,8 @@ function (activity, env, presencepalette, colorpalette, drawmode, numbermode, ga
                 drawHistory.length = 0;
                 cleanupCurrentMode = drawmode(config, savedCopy);
             } else if (nextMode === "number") {
-                cleanupCurrentMode = numbermode(config);
+                // changeShapePalette should only be activated during number mode
+                cleanupCurrentMode = numbermode(config, changeShapePalette);
             } else if (nextMode === "game") {
                 cleanupCurrentMode = gamemode(config);
             }

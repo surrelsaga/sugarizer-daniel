@@ -4,7 +4,7 @@ define([], function () {
     // Receives a config object (shared resources from the controller)
     // Returns a stopNumberMode cleanup function
 
-    return function startNumberMode(config) {
+    return function startNumberMode(config, changeShapePalette) {
         // Get resources from config
         var svgCanvas = config.svgCanvas;
         var gridContainer = config.gridContainer;
@@ -24,7 +24,7 @@ define([], function () {
 
 
         // Hardcoded predefined shape templates
-        // Each array is a dot's gid position to form a desired shape
+        // Each array is a dot's grid position to form a desired shape
         var templates = {
             triangle: [
                 {row: 2, col: 5},
@@ -36,11 +36,44 @@ define([], function () {
                 { row: 2, col: 7},
                 { row: 6, col: 7},
                 { row: 6, col: 3}
+            ],
+            star: [
+                {row: 2, col: 9},
+                {row: 5, col: 10},
+                {row: 5, col: 13},
+                {row: 7, col: 11},
+                {row: 9, col: 11},
+                {row: 8, col: 9},
+                {row: 9, col: 7},
+                {row: 7, col: 7},
+                {row: 5, col: 5},
+                {row: 5, col: 8}
             ]
         };
 
         // Use triangle as the default template to test for now
         var currentTemplate = templates.triangle;
+
+        function onShapeChange(event) {
+            currentTemplate = templates[event.shape];
+
+            // Clear current game state
+            resetGame();
+
+            // Remove old dot wrappers
+            for (var i = 0; i < generatedWrappers.length; i++) {
+                if (generatedWrappers[i].parentNode === gridContainer) {
+                    gridContainer.removeChild(generatedWrappers[i]);
+                }
+            }
+            generatedWrappers = [];
+
+            // Rebuild grid with new template
+            createDotGrid();
+        }
+
+        // Manipulate switch shape templates button
+        changeShapePalette.addEventListener('shapeChange', onShapeChange);
 
         // Get coordinate of every dots
         function getCoordinates(element) {
@@ -157,6 +190,7 @@ define([], function () {
                     }
 
                     function onDotClick() {
+                        console.log("Clicked: row=" + row + ", col=" + col);
                         // Ignore clicks on non-template dots
                         if (templateIndex === undefined) return;
 
