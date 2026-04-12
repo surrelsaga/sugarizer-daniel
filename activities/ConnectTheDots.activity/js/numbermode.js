@@ -8,6 +8,7 @@ define([], function () {
         // Get resources from config
         var svgCanvas = config.svgCanvas;
         var gridContainer = config.gridContainer;
+        var changeColorPalette = config.changeColorPalette;
 
         // 2 layers to draw shape and line
         var shapeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -16,14 +17,17 @@ define([], function () {
         svgCanvas.appendChild(lineLayer);
 
         // State variables
-        var hardcodedColor = "green";
+        var choosenColor = null;
         var currentStep = 0; //current dot that user is at (first dot, second dot,etc..)
         var lastDotCoords = null;
         var connectedPoints = []; //later use all the coordinates of the connected point to form a shape
         var generatedWrappers = [];
 
+        changeColorPalette.addEventListener('colorChange', function(event) {
+            choosenColor = event.color;
+        })
 
-        // Hardcoded predefined shape templates
+        // Hardcoded predefined shape templates (prototype only)
         // Each array is a dot's grid position to form a desired shape
         var templates = {
             triangle: [
@@ -51,7 +55,7 @@ define([], function () {
             ]
         };
 
-        // Use triangle as the default template to test for now
+        // Use triangle as the default template
         var currentTemplate = templates.triangle;
 
         function onShapeChange(event) {
@@ -210,8 +214,8 @@ define([], function () {
                         // and win the game
                         if (currentStep === currentTemplate.length && templateIndex === 0) {
                             var firstCoords = connectedPoints[0];
-                            createLine(lastDotCoords.x, lastDotCoords.y, firstCoords.x, firstCoords.y, hardcodedColor);
-                            createPolygon(connectedPoints, hardcodedColor);
+                            createLine(lastDotCoords.x, lastDotCoords.y, firstCoords.x, firstCoords.y, choosenColor);
+                            createPolygon(connectedPoints, choosenColor);
                             showWinMessage();
 
                             return;
@@ -220,7 +224,7 @@ define([], function () {
                         // Middle steps: must click the next dot in a correct sequence
                         if (templateIndex !== currentStep) return;
                         var currentCoords = getCoordinates(dot);
-                        createLine(lastDotCoords.x, lastDotCoords.y, currentCoords.x, currentCoords.y, hardcodedColor);
+                        createLine(lastDotCoords.x, lastDotCoords.y, currentCoords.x, currentCoords.y, choosenColor);
                         connectedPoints.push(currentCoords);
                         lastDotCoords = currentCoords;
                         currentStep++;
